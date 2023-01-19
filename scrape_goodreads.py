@@ -5,6 +5,9 @@ from PIL import Image
 import shutil 
 import random
 import os
+import pandas as pd
+import datetime
+from math import trunc
 
 
 # https://github.com/maria-antoniak/goodreads-scraper/blob/master/get_books.py
@@ -93,6 +96,21 @@ class Book:
             return False
         else:
             return True
+    
+    def to_dict(self):
+
+        return {
+            "ID_number" : self.ID_number,
+            "isbn" : self.isbn,
+            "num_pages" : self.num_pages,
+            "year_first_published" : self.year_first_published,
+            "cover_imgae_url" : self.cover_image_url,
+            "genres" : self.genres,
+            "average_rating" : self.average_rating,
+            "number_ratings" : self.number_ratings,
+            "title" : self.title
+        }
+        
 
 
 def get_book_info(ID_number):
@@ -112,17 +130,17 @@ def get_book_info(ID_number):
             return None
     else:
         print("Book {ID} not found".format(ID = str(ID_number)))
+        #print(book.soup)
         return None
 
 
-def define_range(lower, upper, num_samples):
+def get_n_unused_IDs(lower, upper, num_samples):
     # excludes images already found and present
     filenames = os.listdir("images/")
     # filenames are in the form "xxxx.png"
     exclude = []
     for filename in filenames:
         exclude.append(int(filename.split(".")[0]))
-    ID_range = range(lower, upper+1)
     chosen_IDs = []
     while len(chosen_IDs) < num_samples:
         ID = random.randint(lower, upper+1)
@@ -130,12 +148,73 @@ def define_range(lower, upper, num_samples):
             chosen_IDs.append(ID)
     return chosen_IDs
 
-book_dict = {}
-ID_numbers = define_range(1,300000,15)
-for ID_number in ID_numbers:
-    book_info = get_book_info(ID_number)
-    if book_info is not None:
-        book_dict[ID_number] = book_info
+def get_one_unused_ID(lower, upper, exclude):
+    i = 0
+    while i < 100:
+        ID = random.randint(lower, upper+1)
+        if ID not in exclude:
+            return ID
+        i += 1
+    return None
+
+def get_n_books(n):
+
+    filenames = os.listdir("images/")
+    # filenames are in the form "xxxx.png"
+    exclude = []
+    for filename in filenames:
+        exclude.append(int(filename.split(".")[0]))
+    books = []
+    n_checked = 0
+    while(len(books)<n):
+        ID_number = get_one_unused_ID(1,300000,exclude)
+        book_info = get_book_info(ID_number)
+        if book_info is not None:
+            books.append(book_info)
+        n_checked +=1
+    return books, n_checked
+
+def add_to_csv(dataframe,filename):
+    filepath = 'book_data/{f}.csv'.format(f = filename)
+    if not os.path.exists(filepath):
+        os.makedirs('book_data', exist_ok=True)  
+        dataframe.to_csv(filepath)
+    else:
+        dataframe.to_csv(filepath, mode = "a", header = False)
+
+def find_and_add_n_books_to_file(n_books, filename):    
+    start_time = datetime.datetime.now()
+    books, n_checked = get_n_books(n_books)
+    dataframe = pd.DataFrame.from_records([book.to_dict() for book in books])
+    add_to_csv(dataframe,filename)
+    end_time = datetime.datetime.now()
+    timespan = end_time - start_time
+    print("Saved {n} books to file, which took {t}s".format(n = n_books, t = timespan.seconds))
+    print("{checked} books were checked".format(checked = n_checked))
 
 
-print(book_dict)
+def main():
+    n_books = 200 # number of books to find
+    n_cycle = 20
+
+    filename = "data"
+    n_cycles = trunc(n_books/n_cycle)
+    remainder = n_books % n_cycles
+    
+    if n_cycles >0:
+        for i in range(n_cycles):
+            find_and_add_n_books_to_file(n_cycle, filename)
+            print("")
+            print("Status: [{n_added}/{n_total}]".format(n_added = n_cycle*(i+1), n_total = n_books))
+            print("")
+    if remainder >0:
+        find_and_add_n_books_to_file(remainder)
+        print("")
+        print("Status: [{n_added}/{n_total}]".format(n_added = n_books, n_total = n_books))
+        print("")
+
+
+
+
+if __name__ == "__main__":
+    main()
