@@ -30,7 +30,10 @@ def get_year_first_published(soup):
     year_first_published = soup.find('nobr', attrs={'class':'greyText'})
     if year_first_published:
         year_first_published = year_first_published.string
-        return re.search('([0-9]{3,4})', year_first_published).group(1)
+        if year_first_published is not None:
+            return re.search('([0-9]{3,4})', year_first_published).group(1)
+        else:
+            return ''
     else:
         return ''
 
@@ -167,7 +170,8 @@ def get_n_books(n):
     books = []
     n_checked = 0
     while(len(books)<n):
-        ID_number = get_one_unused_ID(1,300000,exclude)
+        #after ~3000 books I opened this from 3m to 60m as my range to get newer books
+        ID_number = get_one_unused_ID(1,6000000,exclude)
         book_info = get_book_info(ID_number)
         if book_info is not None:
             books.append(book_info)
@@ -194,7 +198,7 @@ def find_and_add_n_books_to_file(n_books, filename):
 
 
 def main():
-    n_books = 200 # number of books to find
+    n_books = 100 # number of books to find
     n_cycle = 20
 
     filename = "data"
